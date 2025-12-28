@@ -53,12 +53,23 @@ python main.py
 
 The web interface will be available at `http://localhost:8000`
 
+**Optional**: Set the log level via environment variable:
+```bash
+SSP_LOG_LEVEL=DEBUG python main.py
+```
+
 ## Configuration
 
 The application stores configuration in `config.yml` in the application directory. You can configure:
 
 - **Sendspin Server**: The address and port of your sendspin server
 - **Client Name**: Identifier for this client
+
+### Environment Variables
+
+- **`SSP_LOG_LEVEL`**: Set the logging level (default: `INFO`)
+  - Valid values: `DEBUG`, `INFO`, `WARNING`, `ERROR` (case-insensitive)
+  - Example: `SSP_LOG_LEVEL=DEBUG python main.py`
 
 ## Usage
 
