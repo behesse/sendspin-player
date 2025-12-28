@@ -27,6 +27,18 @@ import sys
 from sendspin_player.config import ConfigManager, AppConfig
 from sendspin_player.sendspin_client import SendspinClientWrapper as SendspinClient
 from sendspin_player.audio_device import AudioDeviceManager
+import os
+
+# Get log level from environment variable, default to INFO
+LOG_LEVEL_ENV = os.getenv("SSP_LOG_LEVEL", "INFO").upper()
+LOG_LEVEL_MAP = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+}
+# Default to INFO if invalid level is provided
+LOG_LEVEL = LOG_LEVEL_MAP.get(LOG_LEVEL_ENV, logging.INFO)
 
 # Configure unified logging format for all components
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -95,7 +107,7 @@ root_logger.handlers.clear()
 root_handler = logging.StreamHandler()
 root_handler.setFormatter(LoggerNameFormatter(LOG_FORMAT, LOG_DATE_FORMAT))
 root_logger.addHandler(root_handler)
-root_logger.setLevel(logging.DEBUG)
+root_logger.setLevel(LOG_LEVEL)
 
 # Configure uvicorn loggers to use the same format with intuitive names
 uvicorn_access_logger = logging.getLogger("uvicorn.access")
@@ -109,7 +121,7 @@ for logger_obj in [uvicorn_access_logger, uvicorn_error_logger, uvicorn_logger]:
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
     logger_obj.addHandler(handler)
-    logger_obj.setLevel(logging.DEBUG)
+    logger_obj.setLevel(LOG_LEVEL)
     logger_obj.propagate = False
 
 # Configure application logger
@@ -118,7 +130,7 @@ logger.handlers.clear()
 handler = logging.StreamHandler()
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(LOG_LEVEL)
 logger.propagate = False
 
 app = FastAPI(title="Sendspin Player Configuration")
