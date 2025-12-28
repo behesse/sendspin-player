@@ -2,6 +2,7 @@
   "name": "sendspin-player",
   "version": "1.0.0",
   "description": "Sendspin player web interface dependencies",
+  "license": "AGPL-3.0-or-later",
   "private": true,
   "scripts": {
     "build": "mkdir -p static/vendor && cp node_modules/@picocss/pico/css/pico.min.css static/vendor/ && cp node_modules/htmx.org/dist/htmx.min.js static/vendor/",

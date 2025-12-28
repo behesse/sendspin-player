@@ -93,6 +93,18 @@ The application uses:
 - **Pico.css**: Minimal CSS framework
 - **HTMX**: For dynamic interactions without JavaScript
 
+## License
+
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). See [LICENSE](LICENSE) for details.
+
+AGPL v3 is a strong copyleft license that ensures:
+- Anyone who uses, modifies, or distributes this software must also share their source code
+- This applies even to web services and SaaS applications (unlike GPL)
+- The software remains free and open source for everyone
+- Commercial use is allowed, but derivative works must also be open source
+
+This license helps prevent companies from profiting from this work without contributing back to the community.
+
 ## Notes
 
 - The sendspin player will automatically restart when server configuration changes
