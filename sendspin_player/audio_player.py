@@ -96,6 +96,7 @@ class AudioPlayer:
         self._format: Optional['PCMFormat'] = None  # Server's original format (for timestamp calculations)
         self._playback_format: Optional['PCMFormat'] = None  # Actual playback format (may differ if fallback)
         self._format_mismatch: bool = False  # True if playback format differs from server format
+        self._resampling_warned: bool = False  # Track if we've warned about active resampling
         self._queue: asyncio.Queue[_QueuedChunk] = asyncio.Queue()
         self._stream: Optional[sounddevice.RawOutputStream] = None
         self._closed = False
@@ -153,6 +154,7 @@ class AudioPlayer:
         
         # Reset state on format change
         self._stream_started = False
+        self._resampling_warned = False  # Reset warning flag on format change
         
         # Get AudioDevice instance for this device
         self._audio_device = self._device_manager.get_device(device)
@@ -199,12 +201,10 @@ class AudioPlayer:
             )
             
             if is_sample_rate_error:
-                logger.error(
-                    f"⚠️  CRITICAL: Device does not support server's sample rate {sample_rate}Hz "
+                logger.warning(
+                    f"Device does not support server's sample rate {sample_rate}Hz "
                     f"(error: {type(e).__name__}: {e}). "
-                    f"Falling back to device default {device_default_rate}Hz. "
-                    f"This will cause audio to play at wrong speed and timestamp desync. "
-                    f"Please use a device that supports {sample_rate}Hz for proper operation."
+                    f"Resampling to device default {device_default_rate}Hz. "
                 )
                 try:
                     self._stream = self._audio_device.create_output_stream(
@@ -225,9 +225,8 @@ class AudioPlayer:
                         bit_depth=pcm_format.bit_depth
                     )
                     self._format_mismatch = True  # Mark that formats don't match - will trigger resampling
-                    logger.warning(
-                        f"Device requires {device_default_rate}Hz instead of server's {sample_rate}Hz. "
-                        f"Audio will be resampled to match device requirements."
+                    logger.info(
+                        f"Audio resampling enabled: server {sample_rate}Hz -> device {device_default_rate}Hz"
                     )
                     logger.info(
                         f"Audio stream configured and started: blocksize={self._BLOCKSIZE}, latency=high{self._audio_device.format_info_string()}, "
@@ -366,6 +365,14 @@ class AudioPlayer:
             # Resample audio from server rate to playback rate
             server_rate = self._format.sample_rate
             playback_rate = self._playback_format.sample_rate
+            
+            # Warn once when resampling first occurs
+            if not self._resampling_warned:
+                logger.warning(
+                    f"Resampling audio: server {server_rate}Hz -> device {playback_rate}Hz. "
+                    f"This may slightly increase CPU usage but ensures correct playback speed."
+                )
+                self._resampling_warned = True
             
             # Convert bytes to numpy array (int16)
             audio_array = np.frombuffer(payload, dtype=np.int16)
