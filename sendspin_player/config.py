@@ -25,8 +25,6 @@ from dataclasses import dataclass, asdict
 class AppConfig:
     """Application configuration model."""
     sendspin_server_url: str = ""
-    wifi_ssid: str = ""
-    wifi_password: str = ""
     client_name: str = "sendspin-player"
     audio_device: Optional[str] = None  # None for default device, str for device name
 
@@ -63,8 +61,6 @@ class ConfigManager:
                     
                     config_dict = {
                         'sendspin_server_url': server_url,
-                        'wifi_ssid': data.get('wifi_ssid', ''),
-                        'wifi_password': data.get('wifi_password', ''),
                         'client_name': data.get('client_name', 'sendspin-player'),
                         'audio_device': audio_device
                     }

@@ -226,19 +226,6 @@ async def tab_sendspin(request: Request):
     )
 
 
-@app.get("/tab/wifi", response_class=HTMLResponse)
-async def tab_wifi(request: Request):
-    """WiFi config tab content."""
-    config = config_manager.get_config()
-    return templates.TemplateResponse(
-        "tab_wifi.html",
-        {
-            "request": request,
-            "config": config
-        }
-    )
-
-
 @app.get("/api/status/partial", response_class=HTMLResponse)
 async def status_partial(request: Request):
     """Partial status update for auto-refresh."""
@@ -295,32 +282,6 @@ async def update_sendspin_config(
                 "discovered_servers": discovered_servers,
                 "audio_devices": audio_devices,
                 "message": "Configuration saved successfully!"
-            }
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.post("/api/config/wifi", response_class=HTMLResponse)
-async def update_wifi_config(
-    request: Request,
-    ssid: str = Form(...),
-    password: str = Form("")
-):
-    """Update WiFi configuration."""
-    try:
-        config_manager.update_config(
-            wifi_ssid=ssid,
-            wifi_password=password
-        )
-        
-        config = config_manager.get_config()
-        return templates.TemplateResponse(
-            "tab_wifi.html",
-            {
-                "request": request,
-                "config": config,
-                "message": "WiFi configuration saved successfully!"
             }
         )
     except Exception as e:
