@@ -29,3 +29,4 @@ config.yml
 static/vendor/
 
 node_modules
+.vscode/
