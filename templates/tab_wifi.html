@@ -1,0 +1,39 @@
+<article>
+    <header>
+        <h2>WiFi Configuration</h2>
+    </header>
+    
+    {% if message %}
+    <div class="message message-success" id="success-message">
+        {{ message }}
+    </div>
+    {% endif %}
+    
+    <form hx-post="/api/config/wifi" 
+          hx-target="#tab-content" 
+          hx-swap="innerHTML">
+        <label for="ssid">
+            SSID
+            <input type="text" 
+                   id="ssid" 
+                   name="ssid" 
+                   value="{{ config.wifi_ssid }}" 
+                   placeholder="Your WiFi Network" 
+                   required>
+        </label>
+        
+        <label for="password">
+            Password
+            <input type="password" 
+                   id="password" 
+                   name="password" 
+                   value="{{ config.wifi_password }}" 
+                   placeholder="WiFi Password">
+        </label>
+        
+        <button type="submit">Save WiFi Settings</button>
+    </form>
+    
+    <small>Note: WiFi configuration changes may require a system restart to take effect.</small>
+</article>
+

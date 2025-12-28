@@ -1,0 +1,17 @@
+{% if discovered_servers %}
+<details open>
+    <summary>Discovered Servers ({{ discovered_servers|length }})</summary>
+    <div class="server-list">
+        {% for server in discovered_servers %}
+        <button type="button" 
+                class="server-item"
+                onclick="document.getElementById('server_url').value='{{ server.url }}';">
+            <span class="server-url">{{ server.display }}</span>
+        </button>
+        {% endfor %}
+    </div>
+</details>
+{% else %}
+<p><em>No servers discovered. Click "Discover Servers" to search.</em></p>
+{% endif %}
+

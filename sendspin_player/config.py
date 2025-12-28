@@ -1,0 +1,81 @@
+"""Configuration management for the sendspin player application."""
+import yaml
+from pathlib import Path
+from typing import Optional
+from dataclasses import dataclass, asdict
+
+
+@dataclass
+class AppConfig:
+    """Application configuration model."""
+    sendspin_server_url: str = ""
+    wifi_ssid: str = ""
+    wifi_password: str = ""
+    client_name: str = "sendspin-player"
+    audio_device: Optional[str] = None  # None for default device, str for device name
+
+
+class ConfigManager:
+    """Manages application configuration persistence."""
+    
+    def __init__(self, config_file: str = "config.yml"):
+        self.config_file = Path(config_file)
+        self._config: Optional[AppConfig] = None
+    
+    def load(self) -> AppConfig:
+        """Load configuration from file or return defaults."""
+        if self._config is not None:
+            return self._config
+        
+        if self.config_file.exists():
+            try:
+                with open(self.config_file, 'r') as f:
+                    data = yaml.safe_load(f) or {}
+                    # Migrate from old format (address + port) to new format (URL)
+                    server_url = data.get('sendspin_server_url', '')
+                    if not server_url and data.get('sendspin_server_address'):
+                        # Migrate old format to new format
+                        address = data.get('sendspin_server_address', '')
+                        port = data.get('sendspin_server_port', 8080)
+                        if address:
+                            server_url = f"ws://{address}:{port}"
+                    
+                    audio_device = data.get('audio_device')
+                    # Ensure audio_device is a string or None
+                    if audio_device is not None and not isinstance(audio_device, str):
+                        audio_device = None
+                    
+                    config_dict = {
+                        'sendspin_server_url': server_url,
+                        'wifi_ssid': data.get('wifi_ssid', ''),
+                        'wifi_password': data.get('wifi_password', ''),
+                        'client_name': data.get('client_name', 'sendspin-player'),
+                        'audio_device': audio_device
+                    }
+                    self._config = AppConfig(**config_dict)
+            except (yaml.YAMLError, ValueError, TypeError) as e:
+                print(f"Error loading config: {e}. Using defaults.")
+                self._config = AppConfig()
+        else:
+            self._config = AppConfig()
+        
+        return self._config
+    
+    def save(self, config: AppConfig) -> None:
+        """Save configuration to file."""
+        self._config = config
+        with open(self.config_file, 'w') as f:
+            yaml.dump(asdict(config), f, default_flow_style=False, sort_keys=False)
+    
+    def get_config(self) -> AppConfig:
+        """Get current configuration."""
+        return self.load()
+    
+    def update_config(self, **kwargs) -> AppConfig:
+        """Update configuration with new values."""
+        config = self.load()
+        for key, value in kwargs.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        self.save(config)
+        return config

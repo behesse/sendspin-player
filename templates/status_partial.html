@@ -1,0 +1,70 @@
+<div class="grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+    <div>
+        <h3>Connection</h3>
+        <p>
+            <span class="status-indicator {% if status.running %}status-running{% else %}status-stopped{% endif %}"></span>
+            <strong>Status:</strong> {% if status.running %}Running{% else %}Stopped{% endif %}
+            {% if status.connection_status and status.connection_status != 'disconnected' %}
+            <span style="margin-left: 0.5rem; color: var(--pico-muted-color);">({{ status.connection_status }})</span>
+            {% endif %}
+        </p>
+        <p><strong>Server URL:</strong> {{ status.server_url or 'Not configured' }}</p>
+        <p><strong>Client Name:</strong> {{ status.client_name }}</p>
+        {% if status.last_error %}
+        <p style="color: var(--pico-del-color);"><strong>Last Error:</strong> {{ status.last_error }}</p>
+        {% endif %}
+    </div>
+    
+    <div>
+        <h3>Now Playing</h3>
+        {% if status.title or status.artist %}
+        <p><strong>Title:</strong> {{ status.title or 'Unknown' }}</p>
+        <p><strong>Artist:</strong> {{ status.artist or 'Unknown' }}</p>
+        {% if status.album %}<p><strong>Album:</strong> {{ status.album }}</p>{% endif %}
+        {% if status.playback_state %}
+        <p><strong>State:</strong> {{ status.playback_state }}</p>
+        {% endif %}
+        {% if status.volume is not none %}
+        <div style="margin-top: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <strong>Volume:</strong>
+                <div style="flex: 1; background: var(--pico-muted-border); border-radius: 4px; height: 20px; position: relative; overflow: hidden;">
+                    <div style="background: {% if status.muted %}var(--pico-muted-color){% else %}var(--pico-primary){% endif %}; height: 100%; width: {{ status.volume }}%; transition: width 0.3s ease;"></div>
+                </div>
+                <span style="min-width: 3ch; text-align: right;">{{ status.volume }}%</span>
+                {% if status.muted %}
+                <span style="color: var(--pico-muted-color); font-size: 0.9em;">🔇</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% if status.track_progress is not none and status.track_duration is not none %}
+        <p><strong>Progress:</strong> {{ "%.1f"|format(status.track_progress / 1000.0) }}s / {{ "%.1f"|format(status.track_duration / 1000.0) }}s</p>
+        {% endif %}
+        {% else %}
+        <p><em>No track playing</em></p>
+        {% endif %}
+    </div>
+</div>
+
+<div style="margin-top: 1rem;">
+    <h3>Audio</h3>
+    {% if status.audio_device %}
+    <p><strong>Device:</strong> {{ status.audio_device.name }} ({{ status.audio_device.channels }}ch, Index: {{ status.audio_device.index }})</p>
+    {% else %}
+    <p><strong>Device:</strong> Default</p>
+    {% endif %}
+    {% if status.audio_format %}
+    <p><strong>Format:</strong> {{ status.audio_format.sample_rate }}Hz, {{ status.audio_format.channels }}ch, {{ status.audio_format.bit_depth }}bit
+    {% if status.format_mismatch and status.playback_format %}
+    <br><span style="color: orange;">⚠️ Playback: {{ status.playback_format.sample_rate }}Hz (mismatch - may cause issues!)</span>
+    {% endif %}
+    </p>
+    {% else %}
+    <p><strong>Format:</strong> Not configured</p>
+    {% endif %}
+    {% if status.audio_queue %}
+    <p><strong>Queue:</strong> {{ status.audio_queue.queue_size }} chunks {% if status.audio_queue.stream_started %}(Playing){% else %}(Buffering){% endif %}</p>
+    {% endif %}
+</div>
+

@@ -1,0 +1,83 @@
+<article>
+    <header>
+        <h2>Sendspin Server Configuration</h2>
+    </header>
+    
+    {% if message %}
+    <div class="message message-success" id="success-message">
+        {{ message }}
+    </div>
+    {% endif %}
+    
+    <div style="display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+        <div id="server-list-section" style="flex: 1; min-width: 200px;">
+            {% if discovered_servers %}
+            <details open>
+                <summary>Discovered Servers ({{ discovered_servers|length }})</summary>
+                <div class="server-list">
+                    {% for server in discovered_servers %}
+                    <button type="button" 
+                            class="server-item"
+                            onclick="document.getElementById('server_url').value='{{ server.url }}';">
+                        <span class="server-url">{{ server.display }}</span>
+                    </button>
+                    {% endfor %}
+                </div>
+            </details>
+            {% else %}
+            <p><em>No servers discovered. Click "Discover Servers" to search.</em></p>
+            {% endif %}
+        </div>
+        <button type="button" 
+                class="secondary"
+                id="discover-button"
+                hx-post="/api/servers/discover"
+                hx-target="#server-list-section"
+                hx-swap="innerHTML"
+                hx-indicator="#discover-button">
+            <span id="discover-spinner">⏳ </span>
+            <span id="discover-text">Discover Servers</span>
+        </button>
+    </div>
+    
+    <form hx-post="/api/config/sendspin" 
+          hx-target="#tab-content" 
+          hx-swap="innerHTML">
+        <label for="server_url">
+            Server URL
+            <input type="text" 
+                   id="server_url" 
+                   name="server_url" 
+                   value="{{ config.sendspin_server_url }}" 
+                   placeholder="ws://192.168.1.100:8080/sendspin" 
+                   required>
+            <small>WebSocket URL including protocol (ws:// or wss://) and optional path</small>
+        </label>
+        
+        <label for="client_name">
+            Client Name
+            <input type="text" 
+                   id="client_name" 
+                   name="client_name" 
+                   value="{{ config.client_name }}" 
+                   placeholder="sendspin-player" 
+                   required>
+        </label>
+        
+        <label for="audio_device">
+            Audio Device
+            <select id="audio_device" name="audio_device">
+                <option value="">Default Device</option>
+                {% for device in audio_devices %}
+                <option value="{{ device.name }}" {% if config.audio_device == device.name %}selected{% endif %}>
+                    {{ device.name }} ({{ device.channels }}ch{% if device.is_default %}, Default{% endif %})
+                </option>
+                {% endfor %}
+            </select>
+            <small>Select audio output device. Leave as "Default Device" to use system default.</small>
+        </label>
+        
+        <button type="submit">Save Configuration</button>
+    </form>
+</article>
+
