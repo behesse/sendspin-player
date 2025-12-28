@@ -138,6 +138,20 @@ config = config_manager.get_config()
 sendspin_client = SendspinClient(config)
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Auto-start sendspin player on application startup if server is configured."""
+    if config.sendspin_server_url and config.sendspin_server_url.strip():
+        logger.info(f"Server configured: {config.sendspin_server_url}. Auto-starting client...")
+        try:
+            await sendspin_client.start()
+            logger.info("Client started successfully on startup")
+        except Exception as e:
+            logger.warning(f"Failed to auto-start client on startup: {e}")
+    else:
+        logger.info("No server configured. Client will not auto-start.")
+
+
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up sendspin player on application shutdown."""
