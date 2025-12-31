@@ -26,7 +26,7 @@ import sys
 
 from sendspin_player.config import ConfigManager, AppConfig
 from sendspin_player.sendspin_client import SendspinClientWrapper as SendspinClient
-from sendspin_player.audio_device import AudioDeviceManager
+from aiosendspin_sounddevice.audio_device import AudioDeviceManager
 import os
 
 # Get log level from environment variable, default to INFO
@@ -260,9 +260,12 @@ async def update_sendspin_config(
             audio_device=audio_device_name
         )
         
-        # Resolve device name to index and update client
+        # Resolve device name to AudioDevice and update client
         device_manager = AudioDeviceManager()
-        sendspin_client._audio_device = device_manager.resolve_device(audio_device_name)
+        resolved_device = None
+        if audio_device_name:
+            resolved_device = device_manager.find_by_name(audio_device_name, exact=False)
+        sendspin_client._audio_device = resolved_device
         
         # Restart client if running
         if sendspin_client.is_running:

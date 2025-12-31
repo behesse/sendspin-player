@@ -108,6 +108,58 @@
         .status-stopped {
             background-color: #f44336;
         }
+        article {
+            margin-top: 0.75rem;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+        article > header {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        article > header h2,
+        article > header h3 {
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+        /* Status page utility classes */
+        .status-controls {
+            margin-bottom: 0.75rem;
+        }
+        .status-paragraph {
+            margin-bottom: 0.5rem;
+        }
+        .status-no-margin {
+            margin: 0;
+        }
+        .status-mark {
+            margin-right: 0.5rem;
+        }
+        .status-progress-container {
+            margin-bottom: 0.5rem;
+        }
+        .status-progress {
+            margin-bottom: 0.25rem;
+        }
+        .status-time-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        .status-volume-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .status-volume-label {
+            min-width: 70px;
+        }
+        .status-volume-bar {
+            flex: 1;
+        }
+        .status-error {
+            margin-top: 0.5rem;
+            margin-bottom: 0;
+        }
         .message {
             padding: 1rem;
             margin-bottom: 1rem;
@@ -229,6 +281,7 @@
                 border-bottom-color: transparent;
             }
         }
+        
     </style>
 </head>
 <body>
