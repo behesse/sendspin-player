@@ -49,7 +49,7 @@
         <small>({{ status.connection_status }})</small>
         {% endif %}
     </p>
-    <dl class="status-no-margin">
+    <dl class="status-dl">
         <dt>Server</dt>
         <dd>{{ status.server_url or 'Not configured' }}</dd>
         <dt>Client</dt>
@@ -66,7 +66,7 @@
         <h3>Audio Device</h3>
     </header>
     {% if status.audio_device %}
-    <dl class="status-no-margin">
+    <dl class="status-dl">
         <dt>Device</dt>
         <dd>{{ status.audio_device.name }}</dd>
         <dt>Channels</dt>
