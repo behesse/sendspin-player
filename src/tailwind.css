@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+    /* Message styles - using theme colors */
+    .message-success {
+        @apply bg-theme-success text-theme-success-text border border-theme-success-border;
+    }
+
+    .message-error {
+        @apply bg-theme-error text-theme-error-text border border-theme-error-border;
+    }
+
+    /* HTMX loading indicator */
+    .htmx-request .htmx-indicator {
+        @apply inline;
+    }
+
+    .htmx-request .htmx-hide {
+        @apply hidden;
+    }
+
+    .htmx-request {
+        @apply opacity-70 cursor-wait;
+    }
+
+    /* Navigation button styling - make links look like buttons */
+    .nav-button {
+        @apply no-underline;
+        display: block;
+    }
+    
+    /* Navigation button active state - using theme colors */
+    .nav-button.active {
+        @apply border-b-[3px] border-blue-500 text-blue-500 font-semibold;
+    }
+
+    /* Smooth transitions for status updates - prevent layout shifts */
+    #status-playback-content,
+    #status-server-content,
+    #status-audio-device-content {
+        contain: layout style paint;
+        will-change: contents;
+    }
+}
+
+@layer utilities {
+    @keyframes slide-in {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .animate-slide-in {
+        animation: slide-in 0.3s ease-out;
+    }
+}
+
+/* Responsive: stack labels above inputs on mobile */
+@media (max-width: 640px) {
+    .grid-cols-\[150px_1fr\] {
+        grid-template-columns: 1fr;
+    }
+    
+    .grid-cols-\[150px_1fr\] dt {
+        @apply pt-0 mb-1;
+    }
+    
+    .grid-cols-\[150px_1fr\] dd {
+        @apply text-left;
+    }
+    
+    nav ul {
+        @apply flex-col border-b-0;
+    }
+    
+    .nav-button {
+        @apply border-b-0 border-l-[3px] border-transparent ml-0 w-full text-left;
+    }
+    
+    .nav-button.active {
+        @apply border-l-[3px] border-blue-500 border-b-transparent;
+    }
+}
+

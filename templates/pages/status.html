@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Status - Sendspin Player Configuration{% endblock %}
+
+{% block content %}
+{% if message %}
+<div class="message {% if 'Error' in message %}message-error{% else %}message-success{% endif %} p-4 mb-4 rounded animate-slide-in" id="success-message">
+    {{ message }}
+</div>
+{% endif %}
+
+{% include "components/status_controls.html" %}
+
+<div id="status-info" hx-get="/api/status/partial" hx-trigger="every 3s, refresh from:body" hx-swap="innerHTML" hx-settle="100ms" class="opacity-100 transition-opacity duration-100">
+    {% include "components/status_playback.html" %}
+    {% include "components/status_server.html" %}
+</div>
+
+<article class="bg-theme-bg-card rounded-lg shadow-lg p-6 mb-6 border border-theme-border">
+    <header class="pb-2 mb-2 border-b border-theme-border">
+        <h3 class="text-xl font-semibold m-0 text-theme-text">Audio Device</h3>
+    </header>
+    <div id="status-audio-device-content">
+        {% if status.audio_device %}
+        <dl class="grid grid-cols-[150px_1fr] gap-x-4 gap-y-2 m-0">
+            <dt class="font-medium text-theme-text-secondary m-0 pt-1.5">Device</dt>
+            <dd class="m-0 text-right text-theme-text-muted">{{ status.audio_device.name }}</dd>
+            <dt class="font-medium text-theme-text-secondary m-0 pt-1.5">Channels</dt>
+            <dd class="m-0 text-right text-theme-text-muted">{{ status.audio_device.channels }}ch</dd>
+            {% if status.audio_format %}
+            <dt class="font-medium text-theme-text-secondary m-0 pt-1.5">Format</dt>
+            <dd class="m-0 text-right text-theme-text-muted">{{ status.audio_format.sample_rate }}Hz, {{ status.audio_format.channels }}ch</dd>
+            {% endif %}
+        </dl>
+        {% else %}
+        <p class="m-0 text-sm text-theme-text-secondary">Default device</p>
+        {% endif %}
+    </div>
+</article>
+{% endblock %}

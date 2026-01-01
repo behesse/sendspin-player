@@ -101,37 +101,26 @@ class LoggerNameFormatter(logging.Formatter):
         
         return formatted
 
-# Configure root logger with custom formatter
-root_logger = logging.getLogger()
-root_logger.handlers.clear()
-root_handler = logging.StreamHandler()
-root_handler.setFormatter(LoggerNameFormatter(LOG_FORMAT, LOG_DATE_FORMAT))
-root_logger.addHandler(root_handler)
-root_logger.setLevel(LOG_LEVEL)
-
-# Configure uvicorn loggers to use the same format with intuitive names
-uvicorn_access_logger = logging.getLogger("uvicorn.access")
-uvicorn_error_logger = logging.getLogger("uvicorn.error")
-uvicorn_logger = logging.getLogger("uvicorn")
-
-# Set all uvicorn loggers to use the same handler format
+# Configure logging with custom formatter
 formatter = LoggerNameFormatter(LOG_FORMAT, LOG_DATE_FORMAT)
-for logger_obj in [uvicorn_access_logger, uvicorn_error_logger, uvicorn_logger]:
+
+def configure_logger(logger_name: str) -> logging.Logger:
+    """Configure a logger with the custom formatter."""
+    logger_obj = logging.getLogger(logger_name)
     logger_obj.handlers.clear()
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
     logger_obj.addHandler(handler)
     logger_obj.setLevel(LOG_LEVEL)
     logger_obj.propagate = False
+    return logger_obj
 
-# Configure application logger
+# Configure all loggers
+configure_logger("")  # Root logger
+for logger_name in ["uvicorn.access", "uvicorn.error", "uvicorn", __name__]:
+    configure_logger(logger_name)
+
 logger = logging.getLogger(__name__)
-logger.handlers.clear()
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(LOG_LEVEL)
-logger.propagate = False
 
 app = FastAPI(title="Sendspin Player Configuration")
 
@@ -146,8 +135,8 @@ if static_dir.exists():
 # Initialize configuration and client
 config_manager = ConfigManager()
 config = config_manager.get_config()
-# Initialize client - device name will be resolved to index internally
 sendspin_client = SendspinClient(config)
+_device_manager = AudioDeviceManager()  # Shared device manager instance
 
 
 @app.on_event("startup")
@@ -178,65 +167,87 @@ _discovered_servers_cache = {
 }
 
 
+def _render_template(template_name: str, request: Request, **context) -> HTMLResponse:
+    """Helper to render templates with common context."""
+    return templates.TemplateResponse(template_name, {"request": request, **context})
+
+
+def _render_template_to_string(template_name: str, request: Request, **context) -> str:
+    """Helper to render templates to string (for HTMX partials)."""
+    response = templates.TemplateResponse(template_name, {"request": request, **context})
+    # Render the template to get the HTML string
+    from starlette.responses import Response
+    import asyncio
+    # This is a simplified approach - in practice we'd need to await the response body
+    # For now, we'll use a different approach in the routes
+    return ""
+
+
+def _get_common_context() -> dict:
+    """Get common context data used across multiple endpoints."""
+    return {
+        "config": config_manager.get_config(),
+        "discovered_servers": _discovered_servers_cache["servers"],
+        "audio_devices": SendspinClient.list_audio_devices()
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Main configuration page."""
-    config = config_manager.get_config()
-    status = sendspin_client.get_status()
-    # Use cached servers if available, otherwise empty list
-    discovered_servers = _discovered_servers_cache["servers"]
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "config": config,
-            "status": status,
-            "discovered_servers": discovered_servers
-        }
-    )
+    """Main configuration page - redirects to status by default."""
+    return RedirectResponse(url="/status", status_code=302)
 
 
-@app.get("/tab/status", response_class=HTMLResponse)
-async def tab_status(request: Request):
-    """Status tab content."""
-    status = sendspin_client.get_status()
-    return templates.TemplateResponse(
-        "tab_status.html",
-        {
-            "request": request,
-            "status": status
-        }
-    )
+@app.get("/status", response_class=HTMLResponse)
+async def status_page(request: Request):
+    """Status page."""
+    context = _get_common_context()
+    context["status"] = sendspin_client.get_status()
+    context["active_page"] = "status"
+    return _render_template("pages/status.html", request, **context)
 
 
-@app.get("/tab/sendspin", response_class=HTMLResponse)
-async def tab_sendspin(request: Request):
-    """Sendspin config tab content."""
-    config = config_manager.get_config()
-    discovered_servers = _discovered_servers_cache["servers"]
-    audio_devices = SendspinClient.list_audio_devices()
-    return templates.TemplateResponse(
-        "tab_sendspin.html",
-        {
-            "request": request,
-            "config": config,
-            "discovered_servers": discovered_servers,
-            "audio_devices": audio_devices
-        }
-    )
+@app.get("/sendspin", response_class=HTMLResponse)
+async def sendspin_page(request: Request):
+    """Sendspin config page."""
+    context = _get_common_context()
+    context["active_page"] = "sendspin"
+    return _render_template("pages/sendspin.html", request, **context)
+
+
+def _get_device_defaults(device_name: str = "") -> tuple[int, int]:
+    """Get default sample rate and channels for a device."""
+    if device_name and device_name.strip():
+        device = _device_manager.find_by_name(device_name, exact=False)
+    else:
+        device = _device_manager.get_default_device()
+    
+    if device:
+        return int(device.default_samplerate), device.max_output_channels
+    return 44100, 2  # Defaults
+
+
+@app.get("/api/audio-device", response_class=HTMLResponse)
+async def get_audio_device_info(request: Request):
+    """Get audio device information for populating format defaults via HTMX."""
+    device_name = request.query_params.get("audio_device", "")
+    sample_rate, channels = _get_device_defaults(device_name)
+    return _render_template("components/audio_device_inputs.html", request, sample_rate=sample_rate, channels=channels)
+
+
+@app.get("/api/set-server-url", response_class=HTMLResponse)
+async def set_server_url(request: Request, url: str = ""):
+    """Set server URL via HTMX."""
+    # Get URL from query parameter
+    if not url:
+        url = request.query_params.get("url", "")
+    return _render_template("components/server_url_input.html", request, url=url)
 
 
 @app.get("/api/status/partial", response_class=HTMLResponse)
 async def status_partial(request: Request):
     """Partial status update for auto-refresh."""
-    status = sendspin_client.get_status()
-    return templates.TemplateResponse(
-        "status_partial.html",
-        {
-            "request": request,
-            "status": status
-        }
-    )
+    return _render_template("components/status_partial.html", request, status=sendspin_client.get_status())
 
 
 @app.post("/api/config/sendspin", response_class=HTMLResponse)
@@ -244,7 +255,11 @@ async def update_sendspin_config(
     request: Request,
     server_url: str = Form(...),
     client_name: str = Form("sendspin-player"),
-    audio_device: str = Form("")
+    audio_device: str = Form(""),
+    audio_codec: str = Form("PCM"),
+    audio_channels: int = Form(2),
+    audio_sample_rate: int = Form(44100),
+    audio_bit_depth: int = Form(16)
 ):
     """Update sendspin server configuration."""
     try:
@@ -257,14 +272,17 @@ async def update_sendspin_config(
         config_manager.update_config(
             sendspin_server_url=server_url,
             client_name=client_name,
-            audio_device=audio_device_name
+            audio_device=audio_device_name,
+            audio_codec=audio_codec,
+            audio_channels=audio_channels,
+            audio_sample_rate=audio_sample_rate,
+            audio_bit_depth=audio_bit_depth
         )
         
         # Resolve device name to AudioDevice and update client
-        device_manager = AudioDeviceManager()
         resolved_device = None
         if audio_device_name:
-            resolved_device = device_manager.find_by_name(audio_device_name, exact=False)
+            resolved_device = _device_manager.find_by_name(audio_device_name, exact=False)
         sendspin_client._audio_device = resolved_device
         
         # Restart client if running
@@ -274,87 +292,74 @@ async def update_sendspin_config(
         # Reload config in client
         sendspin_client.config = config_manager.get_config()
         
-        config = config_manager.get_config()
-        discovered_servers = _discovered_servers_cache["servers"]
-        audio_devices = SendspinClient.list_audio_devices()
-        return templates.TemplateResponse(
-            "tab_sendspin.html",
-            {
-                "request": request,
-                "config": config,
-                "discovered_servers": discovered_servers,
-                "audio_devices": audio_devices,
-                "message": "Configuration saved successfully!"
-            }
-        )
+        # Return updated sendspin page with success message
+        context = _get_common_context()
+        context["active_page"] = "sendspin"
+        context["message"] = "Configuration saved successfully!"
+        return _render_template("pages/sendspin.html", request, **context)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+async def _handle_client_action(action_name: str, action_func, success_msg: str, failure_msg: str) -> tuple[str, dict]:
+    """Handle client action (start/stop/restart) and return message and status."""
+    try:
+        result = await action_func()
+        message = success_msg if result else failure_msg
+    except Exception as e:
+        message = f"Error: {str(e)}"
+    return message, sendspin_client.get_status()
 
 
 @app.post("/api/client/start", response_class=HTMLResponse)
 async def start_client(request: Request):
     """Start the sendspin player."""
-    try:
-        if await sendspin_client.start():
-            message = "Client started successfully"
-        else:
-            message = "Client is already running"
-    except Exception as e:
-        message = f"Error: {str(e)}"
-    
-    status = sendspin_client.get_status()
-    return templates.TemplateResponse(
-        "tab_status.html",
-        {
-            "request": request,
-            "status": status,
-            "message": message
-        }
+    message, status = await _handle_client_action(
+        "start",
+        sendspin_client.start,
+        "Client started successfully",
+        "Client is already running"
     )
+    # Return updated status page content
+    context = _get_common_context()
+    context["status"] = status
+    context["active_page"] = "status"
+    context["message"] = message
+    return _render_template("pages/status.html", request, **context)
 
 
 @app.post("/api/client/stop", response_class=HTMLResponse)
 async def stop_client(request: Request):
     """Stop the sendspin player."""
-    try:
-        if await sendspin_client.stop():
-            message = "Client stopped successfully"
-        else:
-            message = "Client is not running"
-    except Exception as e:
-        message = f"Error: {str(e)}"
-    
-    status = sendspin_client.get_status()
-    return templates.TemplateResponse(
-        "tab_status.html",
-        {
-            "request": request,
-            "status": status,
-            "message": message
-        }
+    message, status = await _handle_client_action(
+        "stop",
+        sendspin_client.stop,
+        "Client stopped successfully",
+        "Client is not running"
     )
+    # Return updated status page content
+    context = _get_common_context()
+    context["status"] = status
+    context["active_page"] = "status"
+    context["message"] = message
+    return _render_template("pages/status.html", request, **context)
 
 
 @app.post("/api/client/restart", response_class=HTMLResponse)
 async def restart_client(request: Request):
     """Restart the sendspin player."""
-    try:
-        if await sendspin_client.restart():
-            message = "Client restarted successfully"
-        else:
-            message = "Failed to restart client"
-    except Exception as e:
-        message = f"Error: {str(e)}"
-    
-    status = sendspin_client.get_status()
-    return templates.TemplateResponse(
-        "tab_status.html",
-        {
-            "request": request,
-            "status": status,
-            "message": message
-        }
+    message, status = await _handle_client_action(
+        "restart",
+        sendspin_client.restart,
+        "Client restarted successfully",
+        "Failed to restart client"
     )
+    # Return updated status page content
+    context = _get_common_context()
+    context["status"] = status
+    context["active_page"] = "status"
+    context["message"] = message
+    return _render_template("pages/status.html", request, **context)
 
 
 @app.get("/api/client/status")
@@ -385,7 +390,7 @@ async def discover_servers(request: Request):
     
     # Return just the server list section as HTML
     return templates.TemplateResponse(
-        "server_list.html",
+        "components/server_list.html",
         {
             "request": request,
             "discovered_servers": servers

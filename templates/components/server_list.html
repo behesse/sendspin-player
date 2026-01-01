@@ -1,0 +1,19 @@
+{% if discovered_servers %}
+<details open class="mb-2">
+    <summary class="cursor-pointer font-medium mb-2 text-theme-text-muted">Discovered Servers ({{ discovered_servers|length }})</summary>
+    <div class="flex flex-col gap-2 mt-2">
+        {% for server in discovered_servers %}
+        <button type="button" 
+                class="block w-full px-3 py-2 text-left text-sm bg-theme-bg-input border border-theme-border-light rounded hover:bg-theme-bg-card hover:border-theme-primary-light transition-all active:scale-[0.98] text-theme-text-muted"
+                hx-get="/api/set-server-url?url={{ server.url|urlencode }}"
+                hx-target="#server_url"
+                hx-swap="outerHTML">
+            <span class="font-mono text-xs">{{ server.url }}</span>
+        </button>
+        {% endfor %}
+    </div>
+</details>
+{% else %}
+<p class="text-theme-text-secondary italic text-sm mb-2">No servers discovered. Click "Discover Servers" to search.</p>
+{% endif %}
+

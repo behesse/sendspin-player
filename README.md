@@ -16,7 +16,7 @@ This player works on any headless Linux device with audio output capabilities. C
 ## Features
 
 - Web-based configuration interface using FastAPI
-- Modern UI with Pico.css
+- Modern dark-themed UI with Tailwind CSS
 - Interactive forms with HTMX
 - Configuration management for:
   - Sendspin server address and port
@@ -37,7 +37,7 @@ This player works on any headless Linux device with audio output capabilities. C
 pip install -r requirements.txt
 ```
 
-2. Install frontend dependencies (Pico.css and HTMX):
+2. Install frontend dependencies (Tailwind CSS and HTMX):
 ```bash
 npm install
 ```
@@ -101,7 +101,7 @@ client/
 The application uses:
 - **FastAPI**: Web framework
 - **Jinja2**: Template engine
-- **Pico.css**: Minimal CSS framework
+- **Tailwind CSS**: Utility-first CSS framework with dark theme
 - **HTMX**: For dynamic interactions without JavaScript
 
 ## License

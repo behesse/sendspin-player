@@ -1,315 +1,35 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sendspin Player Configuration{% endblock %}</title>
-    <link rel="stylesheet" href="/static/vendor/pico.min.css">
+    <link rel="stylesheet" href="/static/vendor/tailwind.min.css">
     <script src="/static/vendor/htmx.min.js"></script>
-    <script>
-        (function() {
-            // Handle tab button active states
-            function updateActiveTab(tabName) {
-                const buttons = document.querySelectorAll('.tab-button');
-                buttons.forEach(btn => {
-                    btn.classList.remove('active');
-                });
-                const tabButton = document.querySelector(`[data-tab="${tabName}"]`);
-                if (tabButton) {
-                    tabButton.classList.add('active');
-                }
-            }
-            
-            // Wait for DOM to be ready
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', init);
-            } else {
-                init();
-            }
-            
-            function init() {
-                // Update tab immediately when button is clicked (before HTMX request)
-                document.addEventListener('click', function(evt) {
-                    const button = evt.target.closest('.tab-button');
-                    if (button) {
-                        const tabName = button.getAttribute('data-tab');
-                        if (tabName) {
-                            updateActiveTab(tabName);
-                        }
-                    }
-                }, true); // Use capture phase to run before HTMX
-                
-                // Also catch HTMX requests from tab buttons
-                document.body.addEventListener('htmx:beforeRequest', function(evt) {
-                    const elt = evt.detail.elt;
-                    if (elt && elt.classList.contains('tab-button')) {
-                        const tabName = elt.getAttribute('data-tab');
-                        if (tabName) {
-                            updateActiveTab(tabName);
-                        }
-                    }
-                });
-                
-                // Also update when HTMX swaps content (for form submissions, etc.)
-                document.body.addEventListener('htmx:afterSwap', function(evt) {
-                    if (evt.detail.target && evt.detail.target.id === 'tab-content') {
-                        // Try to determine tab from the request path
-                        const path = evt.detail.pathInfo?.requestPath || '';
-                        const elt = evt.detail.elt;
-                        const postPath = elt?.getAttribute('hx-post') || '';
-                        const getPath = elt?.getAttribute('hx-get') || '';
-                        const fullPath = path || postPath || getPath;
-                        
-                        if (fullPath.includes('/tab/status') || fullPath.includes('/api/client/')) {
-                            updateActiveTab('status');
-                        } else if (fullPath.includes('/tab/sendspin') || fullPath.includes('/api/config/sendspin')) {
-                            updateActiveTab('sendspin');
-                        }
-                    }
-                });
-                
-                // Auto-dismiss success messages after 3 seconds
-                function setupMessageDismiss() {
-                    const message = document.getElementById('success-message');
-                    if (message) {
-                        setTimeout(() => {
-                            message.style.transition = 'opacity 0.3s ease-out';
-                            message.style.opacity = '0';
-                            setTimeout(() => {
-                                if (message.parentNode) {
-                                    message.remove();
-                                }
-                            }, 300);
-                        }, 3000);
-                    }
-                }
-                
-                // Setup message dismiss on page load
-                setupMessageDismiss();
-                
-                // Setup message dismiss after HTMX swaps
-                document.body.addEventListener('htmx:afterSwap', function(evt) {
-                    setupMessageDismiss();
-                });
-            }
-        })();
-    </script>
-    <style>
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-        .status-running {
-            background-color: #4caf50;
-        }
-        .status-stopped {
-            background-color: #f44336;
-        }
-        article {
-            margin-top: 0.75rem;
-            margin-bottom: 0.75rem;
-            padding-bottom: 0.75rem;
-        }
-        article > header {
-            padding-top: 0.5rem;
-            padding-bottom: 0.5rem;
-            margin-bottom: 0.5rem;
-        }
-        article > header h2,
-        article > header h3 {
-            margin-top: 0;
-            margin-bottom: 0;
-        }
-        /* Status page utility classes */
-        .status-controls {
-            margin-bottom: 0.75rem;
-        }
-        .status-paragraph {
-            margin-bottom: 0.5rem;
-        }
-        .status-no-margin {
-            margin: 0;
-        }
-        .status-dl {
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 0.25rem 1rem;
-            margin: 0;
-        }
-        .status-dl dt {
-            font-weight: 500;
-            color: var(--pico-muted-color);
-            margin: 0;
-        }
-        .status-dl dd {
-            margin: 0;
-            text-align: right;
-        }
-        .status-mark {
-            margin-right: 0.5rem;
-        }
-        .status-progress-container {
-            margin-bottom: 0.5rem;
-        }
-        .status-progress {
-            margin-bottom: 0.25rem;
-        }
-        .status-time-grid {
-            grid-template-columns: 1fr 1fr;
-        }
-        .status-volume-control {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .status-volume-label {
-            min-width: 70px;
-        }
-        .status-volume-bar {
-            flex: 1;
-        }
-        .status-error {
-            margin-top: 0.5rem;
-            margin-bottom: 0;
-        }
-        .message {
-            padding: 1rem;
-            margin-bottom: 1rem;
-            border-radius: 4px;
-        }
-        .message-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .message-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        #success-message {
-            animation: slideIn 0.3s ease-out;
-        }
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        #discover-spinner {
-            display: none;
-        }
-        #discover-button.htmx-request #discover-spinner {
-            display: inline;
-        }
-        #discover-button.htmx-request #discover-text {
-            display: none;
-        }
-        #discover-button.htmx-request {
-            opacity: 0.7;
-            cursor: wait;
-        }
-        nav ul {
-            display: flex;
-            list-style: none;
-            padding: 0;
-            margin: 0 0 1rem 0;
-            border-bottom: 2px solid var(--pico-border-color);
-        }
-        nav li {
-            margin: 0;
-        }
-        .tab-button {
-            background: none;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            margin-bottom: -2px;
-            color: var(--pico-muted-color);
-            transition: all 0.2s;
-        }
-        .tab-button:hover {
-            color: var(--pico-color);
-            background: var(--pico-background-color);
-        }
-        .tab-button.active {
-            color: var(--pico-primary-color);
-            border-bottom-color: var(--pico-primary-color);
-            font-weight: 600;
-        }
-        #tab-content {
-            min-height: 300px;
-        }
-        .server-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            margin-top: 0.5rem;
-        }
-        .server-item {
-            display: block;
-            width: 100%;
-            padding: 0.5rem 0.75rem;
-            text-align: left;
-            background: var(--pico-background-color);
-            border: 1px solid var(--pico-border-color);
-            border-radius: var(--pico-border-radius);
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 0.9rem;
-        }
-        .server-item:hover {
-            background: var(--pico-primary-background);
-            border-color: var(--pico-primary-border);
-            color: var(--pico-primary-inverse);
-        }
-        .server-item:active {
-            transform: scale(0.98);
-        }
-        .server-url {
-            font-family: var(--pico-font-family-monospace);
-            font-size: 0.85rem;
-        }
-        @media (max-width: 576px) {
-            nav ul {
-                flex-direction: column;
-                border-bottom: none;
-            }
-            .tab-button {
-                border-bottom: none;
-                border-left: 3px solid transparent;
-                margin-bottom: 0;
-                margin-left: -2px;
-                width: 100%;
-                text-align: left;
-            }
-            .tab-button.active {
-                border-left-color: var(--pico-primary-color);
-                border-bottom-color: transparent;
-            }
-        }
-        
-    </style>
+    <script src="/static/app.js"></script>
 </head>
-<body>
-    <main class="container">
-        <header>
-            <h1>Sendspin Player Configuration</h1>
+<body class="bg-theme-bg text-theme-text">
+    <main class="container mx-auto max-w-4xl px-4 py-8">
+        <header class="mb-6">
+            <h1 class="text-3xl font-bold text-theme-text">Sendspin Player Configuration</h1>
         </header>
         
-        {% if message %}
-        <div class="message message-success">
-            {{ message }}
-        </div>
-        {% endif %}
+        <nav class="mb-6" id="main-nav">
+            <ul class="flex border-b-2 border-theme-border list-none p-0 m-0">
+                <li class="m-0">
+                    <a href="/status"
+                       class="nav-button px-6 py-3 border-b-[3px] border-transparent -mb-0.5 text-theme-text-secondary hover:text-theme-text-muted transition-all {% if active_page == 'status' %}active{% endif %}">
+                        Status
+                    </a>
+                </li>
+                <li class="m-0">
+                    <a href="/sendspin"
+                       class="nav-button px-6 py-3 border-b-[3px] border-transparent -mb-0.5 text-theme-text-secondary hover:text-theme-text-muted transition-all {% if active_page == 'sendspin' %}active{% endif %}">
+                        Sendspin Config
+                    </a>
+                </li>
+            </ul>
+        </nav>
         
         {% block content %}{% endblock %}
     </main>

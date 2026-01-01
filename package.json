@@ -5,12 +5,14 @@
   "license": "AGPL-3.0-or-later",
   "private": true,
   "scripts": {
-    "build": "mkdir -p static/vendor && cp node_modules/@picocss/pico/css/pico.min.css static/vendor/ && cp node_modules/htmx.org/dist/htmx.min.js static/vendor/",
+    "build": "mkdir -p static/vendor && npx tailwindcss -i ./src/tailwind.css -o ./static/vendor/tailwind.min.css --minify && cp node_modules/htmx.org/dist/htmx.min.js static/vendor/",
     "postinstall": "npm run build"
   },
   "dependencies": {
-    "@picocss/pico": "^1.5.11",
     "htmx.org": "^1.9.10"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.1"
   }
 }
 

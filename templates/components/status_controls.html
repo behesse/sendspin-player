@@ -1,0 +1,26 @@
+<div id="status-controls" {% if hx_swap_oob %}hx-swap-oob="true"{% endif %}>
+    <div class="grid grid-cols-3 gap-4 mb-6">
+        <form method="post" action="/api/client/start" hx-post="/api/client/start" hx-target="body" hx-swap="innerHTML" class="w-full">
+            <button type="submit"
+                    class="w-full px-4 py-2 bg-theme-action-start text-white rounded hover:bg-theme-action-start-hover disabled:bg-theme-bg-disabled disabled:text-theme-text-secondary disabled:cursor-not-allowed transition-colors"
+                    {% if status.running %}disabled{% endif %}>
+                ▶ Start
+            </button>
+        </form>
+        <form method="post" action="/api/client/stop" hx-post="/api/client/stop" hx-target="body" hx-swap="innerHTML" class="w-full">
+            <button type="submit"
+                    class="w-full px-4 py-2 bg-theme-action-stop text-white rounded hover:bg-theme-action-stop-hover disabled:bg-theme-bg-disabled disabled:text-theme-text-secondary disabled:cursor-not-allowed transition-colors"
+                    {% if not status.running %}disabled{% endif %}>
+                ⏹ Stop
+            </button>
+        </form>
+        <form method="post" action="/api/client/restart" hx-post="/api/client/restart" hx-target="body" hx-swap="innerHTML" class="w-full">
+            <button type="submit"
+                    class="w-full px-4 py-2 bg-theme-action-restart text-white rounded hover:bg-theme-action-restart-hover disabled:bg-theme-bg-disabled disabled:text-theme-text-secondary disabled:cursor-not-allowed transition-colors"
+                    {% if not status.running %}disabled{% endif %}>
+                🔄 Restart
+            </button>
+        </form>
+    </div>
+</div>
+

@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration - Sendspin Player Configuration{% endblock %}
+
+{% block content %}
+{% if message %}
+<div class="message message-success p-4 mb-4 rounded animate-slide-in" id="success-message">
+    {{ message }}
+</div>
+{% endif %}
+
+<form method="post" 
+      action="/api/config/sendspin"
+      hx-post="/api/config/sendspin"
+      hx-target="body"
+      hx-swap="innerHTML"
+      autocomplete="off"
+      class="space-y-6">
+    <input type="hidden" name="audio_codec" value="PCM">
+    
+    <!-- Server Configuration -->
+    <article class="bg-theme-bg-card rounded-lg shadow-lg p-6 border border-theme-border">
+        <header class="pb-2 mb-4 border-b border-theme-border">
+            <h3 class="text-xl font-semibold m-0 text-theme-text">Server Configuration</h3>
+        </header>
+        
+        <div class="flex items-start gap-4 mb-4 flex-wrap">
+            <div id="server-list-section" class="flex-1 min-w-[200px]">
+                {% include "components/server_list.html" %}
+            </div>
+            <button type="button" 
+                    class="px-4 py-2 bg-theme-bg-input text-white rounded hover:bg-theme-bg-card transition-colors disabled:opacity-50 disabled:cursor-wait border border-theme-border-light"
+                    hx-post="/api/servers/discover"
+                    hx-target="#server-list-section"
+                    hx-swap="innerHTML">
+                <span class="htmx-indicator hidden">⏳ </span>
+                <span class="htmx-hide">Discover Servers</span>
+            </button>
+        </div>
+        
+        <dl class="grid grid-cols-[150px_1fr] gap-x-4 gap-y-3 m-0">
+            <dt class="font-medium text-theme-text-secondary m-0 pt-1.5">
+                <label for="server_url" class="text-theme-text-muted">Server URL</label>
+            </dt>
+            <dd class="m-0 flex flex-col">
+                <input type="text" 
+                       id="server_url" 
+                       name="server_url" 
+                       value="{{ config.sendspin_server_url }}" 
+                       placeholder="ws://192.168.1.100:8080/sendspin" 
+                       class="w-full px-3 py-2 border border-theme-border-light rounded bg-theme-bg-input text-theme-text placeholder-theme-text-secondary focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary"
+                       required>
+                <small class="text-xs text-theme-text-secondary mt-1">WebSocket URL including protocol (ws:// or wss://) and optional path</small>
+            </dd>
+            
+            <dt class="font-medium text-theme-text-secondary m-0 pt-1.5">
+                <label for="client_name" class="text-theme-text-muted">Client Name</label>
+            </dt>
+            <dd class="m-0">
+                <input type="text" 
+                       id="client_name" 
+                       name="client_name" 
+                       value="{{ config.client_name }}" 
+                       placeholder="sendspin-player" 
+                       class="w-full px-3 py-2 border border-theme-border-light rounded bg-theme-bg-input text-theme-text placeholder-theme-text-secondary focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary"
+                       required>
+            </dd>
+        </dl>
+    </article>
+    
+    <!-- Audio Device Configuration -->
+    <article class="bg-theme-bg-card rounded-lg shadow-lg p-6 border border-theme-border">
+        <header class="pb-2 mb-4 border-b border-theme-border">
+            <h3 class="text-xl font-semibold m-0 text-theme-text">Audio Device Configuration</h3>
+        </header>
+        <dl class="grid grid-cols-[150px_1fr] gap-x-4 gap-y-3 m-0">
+            <dt class="font-medium text-theme-text-secondary m-0 pt-1.5">
+                <label for="audio_device" class="text-theme-text-muted">Audio Device</label>
+            </dt>
+            <dd class="m-0 flex flex-col">
+                <select id="audio_device" 
+                        name="audio_device"
+                        autocomplete="off"
+                        hx-get="/api/audio-device"
+                        hx-trigger="change"
+                        hx-include="this"
+                        hx-target="this"
+                        hx-swap="none"
+                        class="w-full px-3 py-2 border border-theme-border-light rounded bg-theme-bg-input text-theme-text focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary">
+                    <option value="">Default Device</option>
+                    {% for device in audio_devices %}
+                    <option value="{{ device.name }}" 
+                            {% if config.audio_device == device.name %}selected{% endif %}>
+                        {{ device.name }} ({{ device.channels }}ch{% if device.is_default %}, Default{% endif %})
+                    </option>
+                    {% endfor %}
+                </select>
+                <small class="text-xs text-theme-text-secondary mt-1">Select audio output device. Leave as "Default Device" to use system default.</small>
+            </dd>
+            
+            <dt class="font-medium text-theme-text-secondary m-0 pt-1.5">
+                <label for="audio_channels" class="text-theme-text-muted">Channels</label>
+            </dt>
+            <dd class="m-0">
+                <input type="number" 
+                       id="audio_channels" 
+                       name="audio_channels" 
+                       value="{{ config.audio_channels or 2 }}" 
+                       min="1" 
+                       max="8" 
+                       class="w-full px-3 py-2 border border-theme-border-light rounded bg-theme-bg-input text-theme-text focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary"
+                       required>
+            </dd>
+            
+            <dt class="font-medium text-theme-text-secondary m-0 pt-1.5">
+                <label for="audio_sample_rate" class="text-theme-text-muted">Sample Rate (Hz)</label>
+            </dt>
+            <dd class="m-0">
+                <input type="number" 
+                       id="audio_sample_rate" 
+                       name="audio_sample_rate" 
+                       value="{{ config.audio_sample_rate or 44100 }}" 
+                       min="8000" 
+                       max="192000"
+                       step="1000" 
+                       class="w-full px-3 py-2 border border-theme-border-light rounded bg-theme-bg-input text-theme-text focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary"
+                       required>
+            </dd>
+            
+            <dt class="font-medium text-theme-text-secondary m-0 pt-1.5">
+                <label for="audio_bit_depth" class="text-theme-text-muted">Bit Depth</label>
+            </dt>
+            <dd class="m-0 flex flex-col">
+                <input type="number" 
+                       id="audio_bit_depth" 
+                       name="audio_bit_depth" 
+                       value="{{ config.audio_bit_depth or 16 }}" 
+                       readonly
+                       class="w-full px-3 py-2 border border-theme-border-light rounded bg-theme-bg text-theme-text-secondary cursor-not-allowed">
+                <small class="text-xs text-theme-text-secondary mt-1">Currently fixed to 16 bits</small>
+            </dd>
+        </dl>
+    </article>
+    
+    <button type="submit" class="px-6 py-2 bg-theme-primary text-white rounded hover:bg-theme-primary-hover transition-colors">Save Configuration</button>
+</form>
+{% endblock %}

@@ -24,7 +24,7 @@ import uuid
 from typing import Optional, List, Dict, Any
 from sendspin_player.config import AppConfig
 
-from aiosendspin_sounddevice import SendspinAudioClient, SendspinAudioClientConfig
+from aiosendspin_sounddevice import SendspinAudioClient, SendspinAudioClientConfig, SupportedAudioFormat, AudioCodec
 from aiosendspin_sounddevice.audio_device import AudioDeviceManager
 from aiosendspin_sounddevice.discovery import ServiceDiscovery
 
@@ -49,6 +49,7 @@ class SendspinClientWrapper:
         self.config = config
         self.client: Optional[SendspinAudioClient] = None
         self._connection_task: Optional[asyncio.Task] = None
+        self._event_loop: Optional[asyncio.AbstractEventLoop] = None
         self.is_running = False
         self._connection_status = "disconnected"
         self._last_error: Optional[str] = None
@@ -56,16 +57,18 @@ class SendspinClientWrapper:
         self._device_manager = AudioDeviceManager()
         
         # Resolve audio_device name to AudioDevice object if provided
-        self._audio_device = None
+        self._audio_device = self._resolve_audio_device(audio_device, config.audio_device)
+    
+    def _resolve_audio_device(self, audio_device: Optional[int] = None, config_device: Optional[str] = None) -> Optional[Any]:
+        """Resolve audio device from various input types to AudioDevice object."""
         if audio_device is not None:
-            # audio_device can be int (legacy) or str (device name)
             if isinstance(audio_device, int):
-                self._audio_device = self._device_manager.find_by_index(audio_device)
+                return self._device_manager.find_by_index(audio_device)
             else:
-                self._audio_device = self._device_manager.find_by_name(audio_device, exact=False)
-        elif config.audio_device is not None:
-            # config.audio_device is now a string (device name) or None
-            self._audio_device = self._device_manager.find_by_name(config.audio_device, exact=False)
+                return self._device_manager.find_by_name(audio_device, exact=False)
+        elif config_device is not None:
+            return self._device_manager.find_by_name(config_device, exact=False)
+        return None
     
     async def start(self) -> bool:
         """Start the sendspin client connection."""
@@ -77,39 +80,79 @@ class SendspinClientWrapper:
             logger.debug("Sendspin server URL not configured")
             raise ValueError("Sendspin server URL not configured")
         
+        # Clear any previous error when starting
+        self._last_error = None
+        self._connection_status = "connecting"
+        
         ws_url = self.config.sendspin_server_url
         logger.debug(f"Connecting to websocket URL: {ws_url}")
         logger.info(f"Starting sendspin client connection to {ws_url}")
         
         try:
-            # Set up callbacks for state updates
-            def on_metadata_update(metadata: Dict[str, Any]) -> None:
-                """Handle metadata updates from server."""
-                logger.debug(f"Metadata update: {metadata}")
+            # Set up callbacks for state updates (all just log for now)
+            def create_log_callback(name: str):
+                """Create a callback that logs updates."""
+                def callback(data: Any) -> None:
+                    logger.debug(f"{name}: {data}")
+                return callback
             
-            def on_group_update(group: Dict[str, Any]) -> None:
-                """Handle group updates from server."""
-                logger.debug(f"Group update: {group}")
+            on_metadata_update = create_log_callback("Metadata update")
+            on_group_update = create_log_callback("Group update")
+            on_controller_state_update = create_log_callback("Controller state update")
+            on_event = create_log_callback("Event")
             
-            def on_controller_state_update(state: Dict[str, Any]) -> None:
-                """Handle controller state updates from server."""
-                logger.debug(f"Controller state update: {state}")
+            def on_audio_error(error: Exception, error_msg: str) -> None:
+                """Handle audio playback errors (e.g., unsupported format).
+                
+                Args:
+                    error: The exception that occurred
+                    error_msg: Formatted error message from the library
+                """
+                try:
+                    logger.error(error_msg, exc_info=error)
+                    self._last_error = error_msg
+                    self._connection_status = "error"
+                    # Stop the client connection asynchronously
+                    # We can't await here since this is a callback, so we schedule it
+                    if self.client:
+                        # Try to schedule the stop task using the stored event loop
+                        if self._event_loop and self._event_loop.is_running():
+                            # Schedule task in the event loop thread-safely
+                            def schedule_stop():
+                                try:
+                                    self._event_loop.create_task(self._stop_on_error())
+                                except Exception as e:
+                                    logger.error(f"Error creating stop task: {e}", exc_info=True)
+                            self._event_loop.call_soon_threadsafe(schedule_stop)
+                        else:
+                            # Try to get the current running loop as fallback
+                            try:
+                                loop = asyncio.get_running_loop()
+                                loop.create_task(self._stop_on_error())
+                            except RuntimeError:
+                                logger.warning("Could not schedule client stop: no running event loop available")
+                except Exception as e:
+                    # Make sure the callback itself doesn't raise exceptions
+                    logger.error(f"Error in on_audio_error callback: {e}", exc_info=True)
             
-            def on_event(event: str) -> None:
-                """Handle events from server."""
-                logger.debug(f"Event: {event}")
+            # Resolve audio device config (AudioDevice, str, int, or None)
+            audio_device_config = self._audio_device
+            if not audio_device_config and self.config.audio_device:
+                # Try to resolve by name, fallback to name string if not found
+                audio_device_config = self._device_manager.find_by_name(self.config.audio_device, exact=False) or self.config.audio_device
             
-            # Create client config
-            # audio_device can be AudioDevice, str (name), int (index), or None
-            audio_device_config = None
-            if self._audio_device:
-                audio_device_config = self._audio_device
-            elif self.config.audio_device:
-                # Try to resolve by name
-                audio_device_config = self._device_manager.find_by_name(self.config.audio_device, exact=False)
-                if not audio_device_config:
-                    # If not found, pass the name string directly
-                    audio_device_config = self.config.audio_device
+            # Create supported audio format from config
+            try:
+                codec = AudioCodec[self.config.audio_codec.upper()]
+            except (KeyError, AttributeError):
+                codec = AudioCodec.PCM  # Default to PCM
+            
+            supported_format = SupportedAudioFormat(
+                codec=codec,
+                channels=self.config.audio_channels,
+                sample_rate=self.config.audio_sample_rate,
+                bit_depth=self.config.audio_bit_depth
+            )
             
             client_config = SendspinAudioClientConfig(
                 url=ws_url,
@@ -117,10 +160,12 @@ class SendspinClientWrapper:
                 client_name=self.config.client_name,
                 static_delay_ms=0.0,
                 audio_device=audio_device_config,
+                supported_formats=[supported_format],
                 on_metadata_update=on_metadata_update,
                 on_group_update=on_group_update,
                 on_controller_state_update=on_controller_state_update,
                 on_event=on_event,
+                on_audio_error=on_audio_error,
             )
             
             # Create client
@@ -174,6 +219,42 @@ class SendspinClientWrapper:
             self._connection_status = "disconnected"
             logger.info("Sendspin client connection closed")
     
+    async def _disconnect_and_cleanup(self, error_context: str = "") -> None:
+        """Disconnect client and cancel connection task."""
+        # Disconnect the client
+        if self.client:
+            try:
+                await self.client.disconnect()
+                logger.debug(f"Client disconnected{error_context}")
+            except Exception as e:
+                log_level = logger.error if error_context else logger.debug
+                log_level(f"Error disconnecting client: {e}", exc_info=bool(error_context))
+            finally:
+                self.client = None
+        
+        # Cancel the connection task
+        if self._connection_task and not self._connection_task.done():
+            self._connection_task.cancel()
+            try:
+                await self._connection_task
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.debug(f"Error waiting for cancelled task: {e}", exc_info=True)
+    
+    async def _stop_on_error(self):
+        """Stop the client when an audio error occurs."""
+        try:
+            logger.info("Stopping client due to audio error")
+            await self._disconnect_and_cleanup(" due to audio error")
+            self.is_running = False
+            self._connection_status = "disconnected"
+            logger.info("Client stopped due to audio error")
+        except Exception as e:
+            logger.error(f"Error stopping client after audio error: {e}", exc_info=True)
+            self.is_running = False
+            self._connection_status = "error"
+    
     async def stop(self) -> bool:
         """Stop the sendspin client connection."""
         if not self.is_running:
@@ -183,29 +264,15 @@ class SendspinClientWrapper:
         logger.info("Stopping sendspin client connection")
         
         try:
-            # Cancel the connection task
-            if self._connection_task and not self._connection_task.done():
-                self._connection_task.cancel()
-                try:
-                    await self._connection_task
-                except asyncio.CancelledError:
-                    pass
-            
-            # Disconnect the client
-            if self.client:
-                try:
-                    await self.client.disconnect()
-                except Exception as e:
-                    logger.debug(f"Error disconnecting client: {e}")
-                self.client = None
-            
+            await self._disconnect_and_cleanup()
             self.is_running = False
             self._connection_status = "disconnected"
             logger.info("Sendspin client stopped successfully")
             return True
-            
         except Exception as e:
-            logger.error(f"Error stopping client: {e}")
+            logger.error(f"Error stopping client: {e}", exc_info=True)
+            self.is_running = False
+            self._connection_status = "disconnected"
             return False
     
     async def restart(self) -> bool:
@@ -230,25 +297,20 @@ class SendspinClientWrapper:
             logger.error(f"Error discovering servers: {e}")
             return []
     
+    def _get_audio_device_info(self) -> Optional[Dict[str, Any]]:
+        """Get audio device information dictionary."""
+        device = self._audio_device or self._device_manager.get_default_device()
+        if device:
+            return {
+                "index": device.index,
+                "name": device.name,
+                "channels": device.max_output_channels
+            }
+        return None
+    
     def get_status(self) -> dict:
         """Get current status of the client."""
-        # Get audio device info
-        audio_device_info = None
-        if self._audio_device:
-            audio_device_info = {
-                "index": self._audio_device.index,
-                "name": self._audio_device.name,
-                "channels": self._audio_device.max_output_channels
-            }
-        else:
-            # Get default device info
-            default_device = self._device_manager.get_default_device()
-            if default_device:
-                audio_device_info = {
-                    "index": default_device.index,
-                    "name": default_device.name,
-                    "channels": default_device.max_output_channels
-                }
+        audio_device_info = self._get_audio_device_info()
         
         # Get metadata from client
         metadata = {}
@@ -257,60 +319,33 @@ class SendspinClientWrapper:
         muted = None
         track_progress = None
         track_duration = None
-        audio_format_info = None
-        format_mismatch = False
-        playback_format_info = None
-        queue_info = None
         
-        if self.client:
+        if self.client and hasattr(self.client, 'is_connected') and self.client.is_connected:
             try:
-                # Try to get state - the library should handle connection state internally
-                if hasattr(self.client, 'is_connected') and self.client.is_connected:
-                    # Get metadata (includes title, artist, album, track_progress, track_duration)
-                    metadata = self.client.get_metadata() or {}
-                    playback_state = self.client.get_playback_state()
-                    volume, muted = self.client.get_player_volume()
-                    
-                    # get_track_progress() returns interpolated progress if playing
-                    # This is more accurate than metadata.track_progress for live updates
-                    track_progress, track_duration = self.client.get_track_progress()
-                    
-                    # Use track_progress from get_track_progress() if available (more accurate)
-                    # Otherwise fall back to metadata
-                    if track_progress is None and 'track_progress' in metadata:
-                        track_progress = metadata.get('track_progress')
-                    if track_duration is None and 'track_duration' in metadata:
-                        track_duration = metadata.get('track_duration')
-                    
-                    logger.debug(
-                        f"Status: state={playback_state}, progress={track_progress}/{track_duration}, "
-                        f"volume={volume}, muted={muted}, metadata={metadata}"
-                    )
-                    
-                    # Get timing metrics which may include format info
-                    timing_metrics = self.client.get_timing_metrics()
-                    if timing_metrics:
-                        # The library handles format internally, so we don't have direct access
-                        # but we can infer from timing metrics if needed
-                        pass
-                else:
-                    # Client exists but not connected yet
-                    logger.debug(f"Client exists but not connected. is_connected={getattr(self.client, 'is_connected', 'N/A')}, wrapper_status={self._connection_status}")
-            except AttributeError as e:
-                # Client might not be fully initialized yet
-                logger.debug(f"Client not fully initialized: {e}")
-            except Exception as e:
+                metadata = self.client.get_metadata() or {}
+                playback_state = self.client.get_playback_state()
+                volume, muted = self.client.get_player_volume()
+                track_progress, track_duration = self.client.get_track_progress()
+                
+                # Fallback to metadata if get_track_progress() returns None
+                if track_progress is None:
+                    track_progress = metadata.get('track_progress')
+                if track_duration is None:
+                    track_duration = metadata.get('track_duration')
+                
+                logger.debug(
+                    f"Status: state={playback_state}, progress={track_progress}/{track_duration}, "
+                    f"volume={volume}, muted={muted}"
+                )
+            except (AttributeError, Exception) as e:
                 logger.debug(f"Error getting client status: {e}", exc_info=True)
         
         return {
             "running": self.is_running,
-            "format_mismatch": format_mismatch,
-            "playback_format": playback_format_info,
             "server_url": self.config.sendspin_server_url,
             "client_name": self.config.client_name,
             "connection_status": self._connection_status,
             "last_error": self._last_error,
-            # Metadata
             "title": metadata.get("title"),
             "artist": metadata.get("artist"),
             "album": metadata.get("album"),
@@ -319,22 +354,22 @@ class SendspinClientWrapper:
             "muted": muted,
             "track_progress": track_progress,
             "track_duration": track_duration,
-            # Audio device and format
             "audio_device": audio_device_info,
-            "audio_format": audio_format_info,
-            "audio_queue": queue_info
+        }
+    
+    @staticmethod
+    def _device_to_dict(device) -> Dict[str, Any]:
+        """Convert AudioDevice to dictionary."""
+        return {
+            "index": device.index,
+            "name": device.name,
+            "channels": device.max_output_channels,
+            "sample_rate": int(device.default_samplerate),
+            "is_default": device.is_default
         }
     
     @staticmethod
     def list_audio_devices() -> List[Dict[str, Any]]:
         """List available audio output devices."""
         devices = AudioDeviceManager.list_audio_devices()
-        return [
-            {
-                "index": device.index,
-                "name": device.name,
-                "channels": device.max_output_channels,
-                "sample_rate": int(device.default_samplerate)
-            }
-            for device in devices
-        ]
+        return [SendspinClientWrapper._device_to_dict(device) for device in devices]

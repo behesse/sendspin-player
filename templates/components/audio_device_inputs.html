@@ -1,0 +1,20 @@
+<input type="number" 
+       id="audio_channels" 
+       name="audio_channels" 
+       value="{{ channels }}" 
+       min="1" 
+       max="8" 
+       class="w-full px-3 py-2 border border-theme-border-light rounded bg-theme-bg-input text-theme-text focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary"
+       required 
+       hx-swap-oob="true">
+<input type="number" 
+       id="audio_sample_rate" 
+       name="audio_sample_rate" 
+       value="{{ sample_rate }}" 
+       min="8000" 
+       max="192000"
+       step="1000" 
+       class="w-full px-3 py-2 border border-theme-border-light rounded bg-theme-bg-input text-theme-text focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-theme-primary"
+       required 
+       hx-swap-oob="true">
+

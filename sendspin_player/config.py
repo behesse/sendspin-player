@@ -27,6 +27,10 @@ class AppConfig:
     sendspin_server_url: str = ""
     client_name: str = "sendspin-player"
     audio_device: Optional[str] = None  # None for default device, str for device name
+    audio_codec: str = "PCM"  # Audio codec: PCM, OPUS, FLAC
+    audio_channels: int = 2  # Number of audio channels
+    audio_sample_rate: int = 44100  # Sample rate in Hz
+    audio_bit_depth: int = 16  # Bit depth
 
 
 class ConfigManager:
@@ -62,7 +66,11 @@ class ConfigManager:
                     config_dict = {
                         'sendspin_server_url': server_url,
                         'client_name': data.get('client_name', 'sendspin-player'),
-                        'audio_device': audio_device
+                        'audio_device': audio_device,
+                        'audio_codec': data.get('audio_codec', 'PCM'),
+                        'audio_channels': data.get('audio_channels', 2),
+                        'audio_sample_rate': data.get('audio_sample_rate', 44100),
+                        'audio_bit_depth': data.get('audio_bit_depth', 16)
                     }
                     self._config = AppConfig(**config_dict)
             except (yaml.YAMLError, ValueError, TypeError) as e:

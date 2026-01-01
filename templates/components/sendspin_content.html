@@ -1,0 +1,16 @@
+{% if message %}
+<div class="message message-success p-4 mb-4 rounded animate-slide-in" id="success-message">
+    {{ message }}
+</div>
+{% endif %}
+
+<form hx-post="/api/config/sendspin" 
+      hx-push-url="/sendspin"
+      class="space-y-6">
+    <input type="hidden" name="audio_codec" value="PCM">
+    
+    {% include "components/server_config_form.html" %}
+    {% include "components/audio_device_config_form.html" %}
+    
+    <button type="submit" class="px-6 py-2 bg-theme-primary text-white rounded hover:bg-theme-primary-hover transition-colors">Save Configuration</button>
+</form>
